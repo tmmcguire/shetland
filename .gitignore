@@ -1,0 +1,6 @@
+*.swp
+*.txt
+examples/parser-benchmark/parser-benchmark
+examples/picohttp-bench/picohttp-bench
+examples/server/server
+
