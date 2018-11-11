@@ -3,6 +3,10 @@ use "debug"
 use "files"
 use "../../http"
 
+// Parse multiple requests from a file.
+//
+// Data can be from http://www.isi.csic.es/dataset/
+
 actor Main
   let buffer: Reader ref = Reader
   var req: (RawHttpRequest | None) = None

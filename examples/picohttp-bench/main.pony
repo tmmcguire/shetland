@@ -1,6 +1,8 @@
 use "buffered"
 use "../../http"
 
+// HTTP request parser benchmark, from https://github.com/h2o/picohttpparser.
+
 actor Main
   let req: String val =
 "GET /wp-content/uploads/2010/03/hello-kitty-darth-vader-pink.jpg HTTP/1.1\r
