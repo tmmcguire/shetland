@@ -100,7 +100,9 @@ primitive HttpParser
     // parse field-name
     (let name, var cur) = get_token(text, (start, finish))
     // parse separator
-    if (cur >= finish) or (_at(text, cur) != ':') then return (false, ((0,0), (0,0)), 0) end
+    if (cur >= finish) or (_at(text, cur) != ':') then
+      return (false, ((0,0), (0,0)), 0)
+    end
     cur = cur + 1
     // parse field-value
     cur = skip_spaces(text, (cur, finish))
@@ -128,21 +130,38 @@ primitive HttpParser
 
   fun is_whitespace(ch: U8): Bool =>
     """
-    Return true if ch is in (horizontal tab, carriage return, new line (linefeed), space).
+    Return true if ch is in (horizontal tab, carriage return, new line
+    (linefeed), space).
     """
     (ch == 0x09) or (ch == 0x0a) or (ch == 0x0d) or (ch == 0x20)
 
-  fun is_horiz_space(ch: U8): Bool => (ch == 0x09) or (ch == 0x20)
-  fun is_digit(ch: U8):       Bool => (ch >= 0x30) and (ch <= 0x39)
-  fun is_alpha(ch: U8):       Bool => ((ch >= 0x41) and (ch <= 0x5a)) or ((ch >= 0x61) and (ch <= 0x7a))
+  fun is_horiz_space(ch: U8): Bool =>
+    """
+    Return true if ch is a horizontal tab or space.
+    """
+    (ch == 0x09) or (ch == 0x20)
+
+  fun is_digit(ch: U8): Bool =>
+    """
+    Return true if ch is a decimal digit.
+    """
+    (ch >= 0x30) and (ch <= 0x39)
+
+  fun is_alpha(ch: U8): Bool =>
+    """
+    Return true if ch is an upper- or lower-case letter.
+    """
+    ((ch >= 0x41) and (ch <= 0x5a)) or ((ch >= 0x61) and (ch <= 0x7a))
 
   fun is_token_char(ch: U8): Bool =>
     """
-    Return true if ch is in the characters allowed for "tokens" in the HTTP 1.1 spec.
+    Return true if ch is in the characters allowed for "tokens" in the
+    HTTP 1.1 spec.
 
     token = 1*tchar
 
-    tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
+    tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." / "^"
+                / "_" / "`" / "|" / "~" / DIGIT / ALPHA
     """
     // 0x21 0x23-27 0x2a-2d 0x5e 0x5f 0x60 0x7c 0x7e 0x30-39 0x41-5a 0x61-7a
     (((ch == 0x21) or ((ch >= 0x23) and (ch <= 0x27))) or (((ch >= 0x2a) and (ch <= 0x2d)) or (ch == 0x5e))) or
@@ -152,7 +171,9 @@ primitive HttpParser
     """
     Return true if ch is in the characters allowed in the request-line URI by the HTTP 1.1 spec and the URI spec.
 
-    Valid URI characters: "!" / "$" / "%" / "&" / "'" / "(" / ")" / "*" / "+" / "," / "-" / "." / "/" / ":" / ";" / "=" / "?" / "@" / "_" / "~" / DIGIT / ALPHA
+    Valid URI characters: "!" / "$" / "%" / "&" / "'" / "(" / ")" / "*"
+                              / "+" / "," / "-" / "." / "/" / ":" / ";"
+                              / "=" / "?" / "@" / "_" / "~" / DIGIT / ALPHA
     """
     // 0x21 0x24-2f 0x3a 0x3b 0x3d 0x3f 0x40 0x5f 0x7e
     (((ch == 0x21) or ((ch >= 0x24) and (ch <= 0x2f))) or (((ch == 0x3a) or

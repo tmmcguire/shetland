@@ -15,13 +15,6 @@ type ConnectionMode is (ReadHeader | ReadData | ReadChunked)
 
 // ====================================
 
-interface HttpRequestNotify
-  fun ref request(connection: TCPConnection tag, header: RawHttpRequest iso)
-  fun ref received(connection: TCPConnection tag, data: Array[U8 val] iso)
-  fun ref eod(connection: TCPConnection tag)
-
-// ====================================
-
 class HttpConnection is TCPConnectionNotify
   let _timers:           Timers
   let _notifier:         HttpRequestNotify ref
@@ -95,13 +88,13 @@ class HttpConnection is TCPConnectionNotify
       try
         let r = match HttpParser.parse_request(_buffer.block(eoh)?)
         | let r': RawHttpRequest => r'
-        | None => error
+        | None                   => error
         end
         Debug("request: " + r.string())
         _persistent = r.persistent()
         let transferEncoding = r.transferEncoding()
         let contentLength = r.contentLength()
-        Debug(_persistent.string() + " " + transferEncoding() + " " + contentLength.string())
+        Debug(_persistent.string() + " " + transferEncoding.string() + " " + contentLength.string())
         /* forward request */
         _notifier.request(conn, r.clone())
         match transferEncoding
@@ -132,7 +125,6 @@ class HttpConnection is TCPConnectionNotify
       _state = ReadHeader
       /* forward end-of-data */
       _notifier.eod(conn)
-      // HttpResponses.ok(conn, not _persistent)
     end
 
   // ----------------------------------

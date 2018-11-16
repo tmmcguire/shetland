@@ -4,18 +4,6 @@ use "net"
 use "signals"
 use "time"
 
-type HttpListenerAuth is (TCPListenerAuth | AmbientAuth | NetAuth | TCPAuth | TCPListenAuth)
-
-// ====================================
-
-interface HttpListenNotify
-  fun ref listening(local_address: NetAddress val) => None
-  fun ref not_listening() => None
-  fun ref closed() => None
-  fun ref connected(): HttpRequestNotify iso^
-
-// ====================================
-
 class val HttpListener
   let _listener: TCPListener tag
 
@@ -28,8 +16,15 @@ class val HttpListener
     init_size: USize = 64,
     max_size: USize = 16384)
   =>
-    _listener = TCPListener(auth, HttpConnectionHandler(consume notifier),
-      host, service, limit, init_size, max_size)
+    _listener = TCPListener(
+      auth,
+      HttpConnectionHandler(consume notifier),
+      host,
+      service,
+      limit,
+      init_size,
+      max_size
+    )
 
   fun dispose() => _listener.dispose()
 
@@ -47,10 +42,12 @@ class HttpConnectionHandler is TCPListenNotify
     _notifier.listening(listen.local_address())
 
   // Error binding port
-  fun ref not_listening(listen: TCPListener ref) => _notifier.not_listening()
+  fun ref not_listening(listen: TCPListener ref) =>
+    _notifier.not_listening()
 
   // Listening socket closed?
-  fun ref closed(listen: TCPListener ref): None => _notifier.closed()
+  fun ref closed(listen: TCPListener ref):
+    None => _notifier.closed()
 
   // Client connected
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>

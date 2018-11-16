@@ -1,40 +1,5 @@
 use "debug"
 
-// ------------------------------------
-// Important headers
-
-primitive HConnection       fun apply(): String => "CONNECTION"
-primitive HTransferEncoding fun apply(): String => "TRANSFER-ENCODING"
-primitive HContentLength    fun apply(): String => "CONTENT-LENGTH"
-
-type Header is (HConnection|HTransferEncoding|HContentLength)
-
-// ------------------------------------
-// Connection header tokens
-
-primitive CClose     fun apply(): String => "CLOSE"
-primitive CKeepAlive fun apply(): String => "KEEP-ALIVE"
-
-type Connection is (CClose | CKeepAlive)
-
-// ------------------------------------
-// Transfer-encoding tokens
-
-primitive TENone     fun apply(): String => "NONE"
-primitive TEChunked  fun apply(): String => "CHUNKED"
-primitive TECompress fun apply(): String => "COMPRESS"
-primitive TEDeflate  fun apply(): String => "DEFLATE"
-primitive TEGzip     fun apply(): String => "GZIP"
-primitive TEOther    fun apply(): String => "UNKNOWN"
-
-type TransferEncoding is (TENone|TEChunked|TECompress|TEDeflate|TEGzip|TEOther)
-
-// ------------------------------------
-
-interface val Stringish fun apply(): String
-
-// ------------------------------------
-
 class RawHttpRequest
   var text:               Text
   // Request line
@@ -168,7 +133,7 @@ class RawHttpRequest
       start = start + 1
     end
     ifdef debug then
-      Debug("Transfer-Encoding " + _transferEncoding())
+      Debug("Transfer-Encoding " + _transferEncoding.string())
     end
     true
 
@@ -224,7 +189,7 @@ class RawHttpRequest
     The comparison is case insensitive, but str must be uppercase.
     """
     (let start, let finish) = ext
-    let str' = str()
+    let str' = str.string()
     let sSize = str'.size()
     if (finish - start) != sSize then
       return false
