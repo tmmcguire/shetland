@@ -6,7 +6,7 @@ use "../../http"
 actor Main
   new create(env: Env) =>
     try
-      let listener = HttpListener(env.root as AmbientAuth, ListenHandler(env.out) where host = "", service = "8080")
+      let listener = HttpServer(env.root as AmbientAuth, ListenHandler(env.out) where host = "", service = "8080")
       SignalHandler(SigHandler(listener), Sig.hup())
       SignalHandler(SigHandler(listener), Sig.term())
       SignalHandler(SigHandler(listener), Sig.int())
@@ -17,8 +17,8 @@ actor Main
 // ====================================
 
 class SigHandler is SignalNotify
-  let _listener: HttpListener val
-  new iso create(listener: HttpListener val) => _listener = listener
+  let _listener: HttpServer val
+  new iso create(listener: HttpServer val) => _listener = listener
   fun ref apply(count: U32): Bool => _listener.dispose(); true
 
 // ------------------------------------

@@ -1,6 +1,6 @@
 use "net"
 
-type HttpListenerAuth is (TCPListenerAuth | AmbientAuth | NetAuth | TCPAuth | TCPListenAuth)
+type HttpServerAuth is (TCPListenerAuth | AmbientAuth | NetAuth | TCPAuth | TCPListenAuth)
 
 // ====================================
 

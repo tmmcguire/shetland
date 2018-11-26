@@ -4,11 +4,11 @@ use "net"
 use "signals"
 use "time"
 
-class val HttpListener
+class val HttpServer
   let _listener: TCPListener tag
 
   new val create(
-    auth: HttpListenerAuth,
+    auth: HttpServerAuth,
     notifier: HttpListenNotify iso,
     host: String = "",
     service: String = "8080",
