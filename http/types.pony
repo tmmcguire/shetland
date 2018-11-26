@@ -4,18 +4,20 @@ type HttpServerAuth is (TCPListenerAuth | AmbientAuth | NetAuth | TCPAuth | TCPL
 
 // ====================================
 
-interface HttpListenNotify
+interface HttpSvrListenerNotify
   fun ref listening(local_address: NetAddress val) => None
   fun ref not_listening() => None
   fun ref closed() => None
-  fun ref connected(): HttpRequestNotify iso^
+  fun ref connected(): HttpSvrConnectionNotify iso^
 
 // ====================================
 
-interface HttpRequestNotify
-  fun ref request(connection: TCPConnection tag, header: RawHttpRequest iso)
-  fun ref received(connection: TCPConnection tag, data: Array[U8 val] iso)
-  fun ref eod(connection: TCPConnection tag)
+interface HttpSvrConnectionNotify
+  fun ref request(connection: TCPConnection box, header: RawHttpRequest iso)
+  fun ref received(connection: TCPConnection box, data: Array[U8 val] iso)
+  fun ref eod(connection: TCPConnection box)
+  fun ref throttled(connection: TCPConnection box) => None
+  fun ref unthrottled(connection: TCPConnection box) => None
 
 // ====================================
 

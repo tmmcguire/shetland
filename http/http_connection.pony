@@ -17,7 +17,7 @@ type ConnectionMode is (ReadHeader | ReadData | ReadChunked)
 
 class HttpConnection is TCPConnectionNotify
   let _timers:           Timers
-  let _notifier:         HttpRequestNotify ref
+  let _notifier:         HttpSvrConnectionNotify ref
   let _read_yield_count: USize
   let _timeout:          U64
   let _buffer:           Reader            = Reader
@@ -27,7 +27,7 @@ class HttpConnection is TCPConnectionNotify
 
   new iso create(
       timers:           Timers,
-      notifier:         HttpRequestNotify iso,
+      notifier:         HttpSvrConnectionNotify iso,
       read_yield_count: USize = 10             /* 10 requests / yield */,
       timeout:          U64   = 10_000_000_000 /* 10 seconds */)
   =>

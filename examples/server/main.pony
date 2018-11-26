@@ -23,7 +23,7 @@ class SigHandler is SignalNotify
 
 // ------------------------------------
 
-class iso ListenHandler is HttpListenNotify
+class iso ListenHandler is HttpSvrListenerNotify
   let _out: OutStream
 
   new iso create(out: OutStream) => _out = out
@@ -38,11 +38,11 @@ class iso ListenHandler is HttpListenNotify
 
   fun ref not_listening() => _out.print("cannot bind to local address")
 
-  fun ref connected(): HttpRequestNotify iso^ => MyRequestNotify(_out)
+  fun ref connected(): HttpSvrConnectionNotify iso^ => MyRequestNotify(_out)
 
 // ------------------------------------
 
-class iso MyRequestNotify is HttpRequestNotify
+class iso MyRequestNotify is HttpSvrConnectionNotify
   let _out: OutStream
   var _persistent: Bool = true
 

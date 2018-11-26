@@ -9,7 +9,7 @@ class val HttpServer
 
   new val create(
     auth: HttpServerAuth,
-    notifier: HttpListenNotify iso,
+    notifier: HttpSvrListenerNotify iso,
     host: String = "",
     service: String = "8080",
     limit: USize = 0,
@@ -18,7 +18,7 @@ class val HttpServer
   =>
     _listener = TCPListener(
       auth,
-      HttpConnectionHandler(consume notifier),
+      _HttpSvrConnectionHandler(consume notifier),
       host,
       service,
       limit,
@@ -30,11 +30,11 @@ class val HttpServer
 
 // ====================================
 
-class HttpConnectionHandler is TCPListenNotify
-  let _notifier: HttpListenNotify iso
+class _HttpSvrConnectionHandler is TCPListenNotify
+  let _notifier: HttpSvrListenerNotify iso
   let _timers: Timers = Timers()
 
-  new iso create(notifier: HttpListenNotify iso) =>
+  new iso create(notifier: HttpSvrListenerNotify iso) =>
     _notifier = consume notifier
 
   // Process has bound to a port
@@ -46,9 +46,10 @@ class HttpConnectionHandler is TCPListenNotify
     _notifier.not_listening()
 
   // Listening socket closed?
-  fun ref closed(listen: TCPListener ref):
-    None => _notifier.closed()
+  fun ref closed(listen: TCPListener ref): None =>
+    _notifier.closed()
 
   // Client connected
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     HttpConnection(_timers, _notifier.connected())
+
