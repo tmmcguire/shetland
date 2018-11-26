@@ -4,14 +4,14 @@ use "format"
 use "net"
 use "time"
 
-primitive ReadHeader
-primitive ReadChunked
+primitive _ReadHeader
+primitive _ReadChunked
 
-class ReadData
+class _ReadData
   var size: USize
   new create(size': USize) => size = size'
 
-type ConnectionMode is (ReadHeader | ReadData | ReadChunked)
+type _ConnectionMode is (_ReadHeader | _ReadData | _ReadChunked)
 
 // ====================================
 
@@ -21,7 +21,7 @@ class HttpConnection is TCPConnectionNotify
   let _read_yield_count: USize
   let _timeout:          U64
   let _buffer:           Reader            = Reader
-  var _state:            ConnectionMode    = ReadHeader
+  var _state:            _ConnectionMode   = _ReadHeader
   var _persistent:       Bool              = true
   var _timer:           (Timer tag | None) = None
 
@@ -38,7 +38,7 @@ class HttpConnection is TCPConnectionNotify
     Debug("connected")
 
   fun ref accepted(conn: TCPConnection ref): None val =>
-    if Platform.debug()
+    ifdef debug
     then
       try
         (let host, let port) = conn.remote_address().name()?
@@ -58,9 +58,9 @@ class HttpConnection is TCPConnectionNotify
     _clear_timer()
     _buffer.append(consume data)
     match _state
-    | ReadHeader           => _read_headers(conn)
-    | let rd: ReadData ref => _read_data(conn, rd)
-    else None
+    | _ReadHeader           => _read_headers(conn)
+    | let rd: _ReadData ref => _read_data(conn, rd)
+    | _ReadChunked          => _read_chunked(conn)
     end
     if _persistent then _set_timer(conn) end
     Debug("times < _read_yield_count: " + (times < _read_yield_count).string())
@@ -122,7 +122,7 @@ class HttpConnection is TCPConnectionNotify
     if (rd.size - size) > 0 then
       rd.size = rd.size - size
     else
-      _state = ReadHeader
+      _state = _ReadHeader
       /* forward end-of-data */
       _notifier.eod(conn)
     end
