@@ -66,6 +66,12 @@ class HttpConnection is TCPConnectionNotify
     Debug("times < _read_yield_count: " + (times < _read_yield_count).string())
     times < _read_yield_count
 
+  fun ref throttled(conn: TCPConnection ref): None val =>
+    _notifier.throttled(conn)
+
+  fun ref unthrottled(conn: TCPConnection ref): None val =>
+    _notifier.unthrottled(conn)
+
   // ----------------------------------
 
   fun ref _set_timer(conn: TCPConnection tag) =>
@@ -139,8 +145,6 @@ class HttpConnection is TCPConnectionNotify
   //   fun ref sent(conn: TCPConnection ref, data: (String val | Array[U8 val] val)): (String val | Array[U8 val] val)
   //   fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter val): ByteSeqIter val
   //   fun ref expect(conn: TCPConnection ref, qty: USize val): USize val
-  //   fun ref throttled(conn: TCPConnection ref): None val => None
-  //   fun ref unthrottled(conn: TCPConnection ref): None val => None
 
 // ====================================
 
