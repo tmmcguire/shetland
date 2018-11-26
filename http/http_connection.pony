@@ -87,37 +87,38 @@ class HttpConnection is TCPConnectionNotify
 
   // ----------------------------------
 
+  // Three possible states for the connection: expecting the request
+  // line and headers, reading and forwarding raw data, or reading and
+  // forwarding chunked data.
+
   fun ref _read_headers(conn: TCPConnection ref) =>
     let eoh = HttpParser.end_of_headers(_buffer)
     if eoh <= _buffer.size() then
+
       Debug("end of header: " + Format.int[USize](eoh))
-      try
-        let r = match HttpParser.parse_request(_buffer.block(eoh)?)
-        | let r': RawHttpRequest => r'
-        | None                   => error
-        end
+      match try HttpParser.parse_request(_buffer.block(eoh)?) end
+      | let r: RawHttpRequest =>
         Debug("request: " + r.string())
         _persistent = r.persistent()
-        let transferEncoding = r.transferEncoding()
-        let contentLength = r.contentLength()
-        Debug(_persistent.string() + " " + transferEncoding.string() + " " + contentLength.string())
-        /* forward request */
-        _notifier.request(conn, r.clone())
-        match transferEncoding
+        /* forward request and current data */
+        match r.transferEncoding()
         | TENone =>
-          let rd = ReadData(contentLength)
+          let rd = _ReadData(r.contentLength())
           _state = rd
+          _notifier.request(conn, r.clone())
           _read_data(conn, rd)
-        | TEChunked => None
+        | TEChunked =>
+          _notifier.request(conn, r.clone())
+          _read_chunked(conn)
         else
-          error
+          HttpResponses.bad_request(conn)
         end
-      else
-        HttpResponses.bad_request(conn)
+      | None => HttpResponses.bad_request(conn)
       end
+
     end
 
-  fun ref _read_data(conn: TCPConnection ref, rd: ReadData ref) =>
+  fun ref _read_data(conn: TCPConnection ref, rd: _ReadData ref) =>
     let size = _buffer.size().min( rd.size )
     if size > 0 then
       try
@@ -132,6 +133,9 @@ class HttpConnection is TCPConnectionNotify
       /* forward end-of-data */
       _notifier.eod(conn)
     end
+
+  fun ref _read_chunked(conn: TCPConnection ref) =>
+    None
 
   // ----------------------------------
 
