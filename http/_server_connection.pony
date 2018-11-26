@@ -123,7 +123,7 @@ class HttpConnection is TCPConnectionNotify
     if size > 0 then
       try
         /* forward data */
-        _notifier.received(conn, _buffer.block(size)?)
+        _notifier.body(conn, _buffer.block(size)?)
       end
     end
     if (rd.size - size) > 0 then
@@ -131,7 +131,7 @@ class HttpConnection is TCPConnectionNotify
     else
       _state = _ReadHeader
       /* forward end-of-data */
-      _notifier.eod(conn)
+      _notifier.end_of_body(conn)
     end
 
   fun ref _read_chunked(conn: TCPConnection ref) =>

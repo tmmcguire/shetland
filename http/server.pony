@@ -18,8 +18,8 @@ interface HttpSvrListenerNotify
 
 interface HttpSvrConnectionNotify
   fun ref request(connection: TCPConnection box, header: RawHttpRequest iso)
-  fun ref received(connection: TCPConnection box, data: Array[U8 val] iso)
-  fun ref eod(connection: TCPConnection box)
+  fun ref body(connection: TCPConnection box, data: Array[U8 val] iso)
+  fun ref end_of_body(connection: TCPConnection box)
   fun ref throttled(connection: TCPConnection box) => None
   fun ref unthrottled(connection: TCPConnection box) => None
 

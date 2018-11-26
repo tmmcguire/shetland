@@ -52,9 +52,9 @@ class iso MyRequestNotify is HttpSvrConnectionNotify
     _persistent = header.persistent()
     _out.print("MyRequestNotify received request: " + header.string() + " " + _persistent.string())
 
-  fun ref received(connection: TCPConnection tag, data: Array[U8 val] iso) =>
+  fun ref body(connection: TCPConnection tag, data: Array[U8 val] iso) =>
     _out.print("MyRequestNotify received data: " + data.size().string())
 
-  fun ref eod(connection: TCPConnection tag) =>
+  fun ref end_of_body(connection: TCPConnection tag) =>
     _out.print("MyRequestNotify end of data" + _persistent.string())
     HttpResponses.ok(connection, not _persistent)
