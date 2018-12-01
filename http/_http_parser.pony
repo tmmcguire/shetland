@@ -56,21 +56,21 @@ primitive HttpParser
     """
     let finish = text.size()
     // parse method
-    var cur = skip_whitespace(text, (0, finish))
-    (let method, cur) = get_token(text, (cur, finish))
+    var cur = _skip_whitespace(text, (0, finish))
+    (let method, cur) = _get_token(text, (cur, finish))
     if _at(text, cur) != 0x20 then
       return None
     end
     // parse uri
-    cur = skip_spaces(text, (cur, finish))
-    (let uri, cur) = match get_uri(text, (cur, finish))
+    cur = _skip_spaces(text, (cur, finish))
+    (let uri, cur) = match _get_uri(text, (cur, finish))
     | (true, let uri': Extent, let cur': USize) => (uri', cur')
     else
       return None
     end
     // parse version
-    cur = skip_spaces(text, (cur, finish))
-    (let version, cur) = match get_version(text, (cur, finish))
+    cur = _skip_spaces(text, (cur, finish))
+    (let version, cur) = match _get_version(text, (cur, finish))
     | (true, let version': USize, let cur': USize) => (version', cur')
     else
       return None
@@ -81,9 +81,9 @@ primitive HttpParser
     | let r: RawHttpRequest => r.reset(text, method, uri, version)
     end
     // parse headers
-    cur = skip_whitespace(text, (cur, finish))
+    cur = _skip_whitespace(text, (cur, finish))
     while (cur <= finish) and (_at(text, cur) != 0x0d) do
-      cur = match parse_header(text, (cur, finish))
+      cur = match _parse_header(text, (cur, finish))
       | (true, let header': Extents, let cur': USize) if request._push_header(header') => cur'
       else
         return None
@@ -91,7 +91,7 @@ primitive HttpParser
     end
     request
 
-  fun parse_header(text: Text, extent: Extent): (Bool, Extents, USize) =>
+  fun _parse_header(text: Text, extent: Extent): (Bool, Extents, USize) =>
     """
     Parse a HTTP header "line" from text.
 
@@ -108,62 +108,62 @@ primitive HttpParser
     """
     (let start, let finish) = extent
     // parse field-name
-    (let name, var cur) = get_token(text, (start, finish))
+    (let name, var cur) = _get_token(text, (start, finish))
     // parse separator
     if (cur >= finish) or (_at(text, cur) != ':') then
       return (false, ((0,0), (0,0)), 0)
     end
     cur = cur + 1
     // parse field-value
-    cur = skip_spaces(text, (cur, finish))
+    cur = _skip_spaces(text, (cur, finish))
     let value_start = cur
     // find end of line
     var ch: U8
     repeat
       // handle continuation lines, if necessary
-      cur = match skip_to_newline(text, (cur, finish))
+      cur = match _skip_to_newline(text, (cur, finish))
       | (true, let cur': USize) => cur'
       else
         return (false, ((0,0), (0,0)), 0)
       end
       ch = _at(text, cur)
-    until (cur >= finish) or (not is_horiz_space(ch)) end
+    until (cur >= finish) or (not _is_horiz_space(ch)) end
     // trim ending whitespace
     var last = cur - 2       // one past last character of previous line
     repeat
       last = last - 1
       ch = _at(text, last)
-    until (last == start) or not is_whitespace(ch) end
+    until (last == start) or not _is_whitespace(ch) end
     (true, (name, (value_start, (last + 1))), cur)
 
   // ----------------------------------
 
-  fun is_whitespace(ch: U8): Bool =>
+  fun _is_whitespace(ch: U8): Bool =>
     """
     Return true if ch is in (horizontal tab, carriage return, new line
     (linefeed), space).
     """
     (ch == 0x09) or (ch == 0x0a) or (ch == 0x0d) or (ch == 0x20)
 
-  fun is_horiz_space(ch: U8): Bool =>
+  fun _is_horiz_space(ch: U8): Bool =>
     """
     Return true if ch is a horizontal tab or space.
     """
     (ch == 0x09) or (ch == 0x20)
 
-  fun is_digit(ch: U8): Bool =>
+  fun _is_digit(ch: U8): Bool =>
     """
     Return true if ch is a decimal digit.
     """
     (ch >= 0x30) and (ch <= 0x39)
 
-  fun is_alpha(ch: U8): Bool =>
+  fun _is_alpha(ch: U8): Bool =>
     """
     Return true if ch is an upper- or lower-case letter.
     """
     ((ch >= 0x41) and (ch <= 0x5a)) or ((ch >= 0x61) and (ch <= 0x7a))
 
-  fun is_token_char(ch: U8): Bool =>
+  fun _is_token_char(ch: U8): Bool =>
     """
     Return true if ch is in the characters allowed for "tokens" in the
     HTTP 1.1 spec.
@@ -175,9 +175,9 @@ primitive HttpParser
     """
     // 0x21 0x23-27 0x2a-2d 0x5e 0x5f 0x60 0x7c 0x7e 0x30-39 0x41-5a 0x61-7a
     (((ch == 0x21) or ((ch >= 0x23) and (ch <= 0x27))) or (((ch >= 0x2a) and (ch <= 0x2d)) or (ch == 0x5e))) or
-    ((((ch == 0x5f) or (ch == 0x60)) or ((ch == 0x7c) or (ch == 0x7e))) or (is_digit(ch) or is_alpha(ch)))
+    ((((ch == 0x5f) or (ch == 0x60)) or ((ch == 0x7c) or (ch == 0x7e))) or (_is_digit(ch) or _is_alpha(ch)))
 
-  fun is_uri_char(ch: U8): Bool =>
+  fun _is_uri_char(ch: U8): Bool =>
     """
     Return true if ch is in the characters allowed in the request-line URI by the HTTP 1.1 spec and the URI spec.
 
@@ -188,7 +188,7 @@ primitive HttpParser
     // 0x21 0x24-2f 0x3a 0x3b 0x3d 0x3f 0x40 0x5f 0x7e
     (((ch == 0x21) or ((ch >= 0x24) and (ch <= 0x2f))) or (((ch == 0x3a) or
         (ch == 0x3b)) or ((ch == 0x3d) or (ch == 0x3f)))) or
-        ((((ch == 0x40) or (ch == 0x5f)) or (ch == 0x7e)) or (is_digit(ch) or is_alpha(ch)))
+        ((((ch == 0x40) or (ch == 0x5f)) or (ch == 0x7e)) or (_is_digit(ch) or _is_alpha(ch)))
 
   // ----------------------------------
 
@@ -200,29 +200,29 @@ primitive HttpParser
 
   // ----------------------------------
 
-  fun skip_whitespace(text: Text, extent: Extent): USize =>
+  fun _skip_whitespace(text: Text, extent: Extent): USize =>
     """
     Return location of first non-whitespace character.
     """
     (let start, let finish) = extent
     var i = start
-    while (i < finish) and (is_whitespace(_at(text, i))) do
+    while (i < finish) and (_is_whitespace(_at(text, i))) do
       i = i + 1
     end
     i
 
-  fun skip_spaces(text: Text, extent: Extent): USize =>
+  fun _skip_spaces(text: Text, extent: Extent): USize =>
     """
     Return the location of the first non-horizontal-space character.
     """
     (let start, let finish) = extent
     var i = start
-    while (i < finish) and is_horiz_space(_at(text, i)) do
+    while (i < finish) and _is_horiz_space(_at(text, i)) do
       i = i + 1
     end
     i
 
-  fun skip_to_newline(text: Text, extent: Extent): (Bool, USize) =>
+  fun _skip_to_newline(text: Text, extent: Extent): (Bool, USize) =>
     """
     Finds the index of the character after the next CR LF pair or the end of the range.
 
@@ -241,18 +241,18 @@ primitive HttpParser
     end
     (false, 0)
 
-  fun get_token(text: Text, extent: Extent): (Extent,USize) =>
+  fun _get_token(text: Text, extent: Extent): (Extent,USize) =>
     """
     Return the extent containing the next token in extent.
     """
     (let start, let finish) = extent
     var i = start
-    while (i < finish) and (is_token_char(_at(text, i))) do
+    while (i < finish) and (_is_token_char(_at(text, i))) do
       i = i + 1
     end
     ((start, i), i)
 
-  fun get_uri(text: Text, extent: Extent): (Bool, Extent, USize) =>
+  fun _get_uri(text: Text, extent: Extent): (Bool, Extent, USize) =>
     """
     Get the URI string from the request line.
 
@@ -263,15 +263,15 @@ primitive HttpParser
     """
     (let start, let finish) = extent
     var i = start
-    while (i < finish) and (is_uri_char(_at(text, i))) do
+    while (i < finish) and (_is_uri_char(_at(text, i))) do
       i = i + 1
     end
-    if (i < finish) and is_whitespace(_at(text, i))
+    if (i < finish) and _is_whitespace(_at(text, i))
     then (true,  (start, i), i)
     else (false, (0,     0), 0)
     end
 
-  fun get_version(text: Text, extent: Extent): (Bool, USize, USize) =>
+  fun _get_version(text: Text, extent: Extent): (Bool, USize, USize) =>
     """
     Get the HTTP minor version number, from the version string.
 

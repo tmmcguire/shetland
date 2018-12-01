@@ -15,7 +15,7 @@ type _ConnectionMode is (_ReadHeader | _ReadData | _ReadChunked)
 
 // ====================================
 
-class HttpConnection is TCPConnectionNotify
+class _HttpConnection is TCPConnectionNotify
   let _timers:           Timers
   let _notifier:         HttpSvrConnectionNotify ref
   let _read_yield_count: USize
@@ -35,26 +35,14 @@ class HttpConnection is TCPConnectionNotify
     _notifier         = consume notifier
     _read_yield_count = read_yield_count
     _timeout          = timeout
-    Debug("connected")
 
   fun ref accepted(conn: TCPConnection ref): None val =>
-    ifdef debug
-    then
-      try
-        (let host, let port) = conn.remote_address().name()?
-        Debug("accepted connection with " + Format(host) + ":" + Format(port))
-      else
-        Debug("accepted")
-      end
-    end
     _set_timer(conn)
 
   fun ref closed(conn: TCPConnection ref): None val =>
     _clear_timer()
-    Debug("closed")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8 val] iso, times: USize val): Bool val =>
-    Debug("received " + Format.int[USize](data.size()))
     _clear_timer()
     _buffer.append(consume data)
     match _state
@@ -63,7 +51,6 @@ class HttpConnection is TCPConnectionNotify
     | _ReadChunked          => _read_chunked(conn)
     end
     if _persistent then _set_timer(conn) end
-    Debug("times < _read_yield_count: " + (times < _read_yield_count).string())
     times < _read_yield_count
 
   fun ref throttled(conn: TCPConnection ref): None val =>
@@ -95,10 +82,8 @@ class HttpConnection is TCPConnectionNotify
     let eoh = HttpParser.end_of_headers(_buffer)
     if eoh <= _buffer.size() then
 
-      Debug("end of header: " + Format.int[USize](eoh))
       match try HttpParser.parse_request(_buffer.block(eoh)?) end
       | let r: RawHttpRequest =>
-        Debug("request: " + r.string())
         _persistent = r.persistent()
         /* forward request and current data */
         match r.transferEncoding()
@@ -155,10 +140,12 @@ class HttpConnection is TCPConnectionNotify
 class _ConnectionTimerNotify is TimerNotify
   var _connection: TCPConnection tag
 
-  new iso create(connection: TCPConnection tag) => _connection = connection
+  new iso create(connection: TCPConnection tag) =>
+    _connection = connection
 
   fun ref apply(timer: Timer ref, count: U64): Bool =>
     HttpResponses.request_timeout(_connection)
     false
 
-  fun ref cancel(timer: Timer) => Debug("timer cancelled")
+  fun ref cancel(timer: Timer) =>
+    None

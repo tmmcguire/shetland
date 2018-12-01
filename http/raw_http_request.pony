@@ -107,7 +107,7 @@ class RawHttpRequest
     _seenConnection = true
     (var start, let finish) = value
     while start < finish do
-      (let token, start) = HttpParser.get_token(text, (start, finish))
+      (let token, start) = HttpParser._get_token(text, (start, finish))
       if     _eq_case(token, CKeepAlive) then _persistent = true
       elseif _eq_case(token, CClose)     then _persistent = false
       end
@@ -128,7 +128,7 @@ class RawHttpRequest
     _seenTE = true
     (var start, let finish) = value
     while start < finish do
-      (let token, start) = HttpParser.get_token(text, (start, finish))
+      (let token, start) = HttpParser._get_token(text, (start, finish))
       _transferEncoding = _parse_transfer_encoding(token)
       start = start + 1
     end
