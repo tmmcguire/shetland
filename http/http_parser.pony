@@ -19,8 +19,8 @@ primitive HttpParser
     """
     Locate a CR NL CR NL string in the buffer.
 
-    Returns the index of the next location in the buffer or greater than the
-    size of the buffer if the string is not found.
+    Returns the index of the next location in the buffer or greater than
+    the size of the buffer if the string is not found.
     """
     let finish = buffer.size()
     var i: USize = 0
@@ -42,12 +42,8 @@ primitive HttpParser
     end
     finish + 1
 
-  // fun _peek(buffer: Reader, i: USize): U8 => try buffer.peek_u8(i)? else 0 end
-
-  fun _eoh(buffer: Reader, i: USize): Bool => try buffer.peek_u32_be(i)? == 0x0d0a0d0a else false end
-
-    // (_peek(buffer, i)   == 0x0d) and (_peek(buffer, i+1) == 0x0a) and
-    // (_peek(buffer, i+2) == 0x0d) and (_peek(buffer, i+3) == 0x0a)
+  fun _eoh(buffer: Reader, i: USize): Bool =>
+    try buffer.peek_u32_be(i)? == 0x0d0a0d0a else false end
 
   // ==================================
 
@@ -96,6 +92,20 @@ primitive HttpParser
     request
 
   fun parse_header(text: Text, extent: Extent): (Bool, Extents, USize) =>
+    """
+    Parse a HTTP header "line" from text.
+
+    Returns a tuple of (validity, header, next character index), where
+    validity is true if a header has been parsed, the header is made of an
+    Extent for the header name and another for the value, cur is the index
+    of the next character after the end of the header's logical line.
+
+    This handles the deprecated "continuation" lines which begin with 
+    spaces or tabs.
+
+    The extent of the value is narrowed to the range between the first
+    non-whitespace character and the last non-whitespace characte.
+    """
     (let start, let finish) = extent
     // parse field-name
     (let name, var cur) = get_token(text, (start, finish))
