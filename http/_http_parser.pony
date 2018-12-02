@@ -83,7 +83,7 @@ primitive HttpParser
     end
     // parse headers
     cur = _skip_whitespace(text, (cur, finish))
-    while (cur <= finish) and (_at(text, cur) != 0x0d) do
+    while (cur < finish) and (_at(text, cur) != 0x0d) do
       cur = match _parse_header(text, (cur, finish))
       | (true, let header': Extents, let cur': USize) if request._push_header(header') => cur'
       else
