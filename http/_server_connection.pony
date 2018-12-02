@@ -15,7 +15,34 @@ type _ConnectionMode is (_ReadHeader | _ReadData | _ReadChunked)
 
 // ====================================
 
-class _HttpConnection is TCPConnectionNotify
+class _HttpSvrConnection is TCPConnectionNotify
+  """
+  HTTP 1.1 server incoming connection.
+
+  This class converts the incoming data stream from the client to HTTP
+  requests followed by the accompanying data.
+
+  The core of the HTTP 1.x protocol is very simple. Fundamentally,
+  it parses an incoming request into a form that can be used by
+  further server-side processing steps (here represented by a
+  HttpSvrConnectionNotify object), in the process determining whether
+  or not the connection can be kept active for future requests. The
+  HttpParser class mostly handles the former; the majority of this class
+  handles the latter.
+
+  An HTTP request is a block of headers followed by some amount of data
+  (or none). In order to determine whether the connection can be reused,
+  two pieces of information are needed:
+
+  - Whether the client supports it: this is true for a HTTP 1.0
+    request with a "Connection: Keep-Alive" header or HTTP 1.1 without a
+    "Connection: Close" header.
+
+  - The end of the request: The end of the request can be found if
+    the request has a "Content-Length" header or a Transfer-Encoding of
+    "Chunked". Otherwise, the end of the request is marked by the close of
+    the connection.
+  """
   let _timers:           Timers
   let _notifier:         HttpSvrConnectionNotify ref
   let _read_yield_count: USize
@@ -42,7 +69,12 @@ class _HttpConnection is TCPConnectionNotify
   fun ref closed(conn: TCPConnection ref): None val =>
     _clear_timer()
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8 val] iso, times: USize val): Bool val =>
+  fun ref received(
+    conn: TCPConnection ref,
+    data: Array[U8 val] iso,
+    times: USize val)
+  : Bool val
+  =>
     _clear_timer()
     _buffer.append(consume data)
     match _state

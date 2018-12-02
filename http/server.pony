@@ -73,5 +73,5 @@ class _HttpSvrConnectionHandler is TCPListenNotify
 
   // Client connected
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    _HttpConnection(_timers, _notifier.connected())
+    _HttpSvrConnection(_timers, _notifier.connected())
 
