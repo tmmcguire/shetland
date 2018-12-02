@@ -19,22 +19,23 @@ primitive HttpParser
     """
     Locate a CR NL CR NL string in the buffer.
 
-    Returns the index of the next location in the buffer or greater than
-    the size of the buffer if the string is not found.
+    Returns the index of the next location in the buffer (which may
+    equal buffer.size()) or greater than the size of the buffer if the
+    string is not found.
     """
     let finish = buffer.size()
     var i: USize = 0
     while i < finish do
       match try buffer.peek_u8(i)? else 0 end
       | 0x0d /* CR */ =>
-        if     _eoh(buffer, i-2) then return (i + 2)
-        elseif _eoh(buffer,   i) then return (i + 4)
-        else                          i = i + 4
+        if     ((i+2) <= finish) and _eoh(buffer, i-2) then return (i + 2)
+        elseif ((i+4) <= finish) and _eoh(buffer,   i) then return (i + 4)
+        else                                                i = i + 4
         end
       | 0x0a /* LF */ =>
-        if     _eoh(buffer, i-3) then return (i + 1)
-        elseif _eoh(buffer, i-1) then return (i + 3)
-        else                          i = i + 4
+        if     /* i+1 <= finish */   _eoh(buffer, i-3) then return (i + 1)
+        elseif ((i+3) <= finish) and _eoh(buffer, i-1) then return (i + 3)
+        else                                                i = i + 4
         end
       else
         i = i + 4
