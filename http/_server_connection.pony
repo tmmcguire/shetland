@@ -5,13 +5,27 @@ use "net"
 use "time"
 
 primitive _ReadHeader
+  """
+  Connection state: expecting a HTTP request line, followed by headers.
+  """
+
+primitive _ReadData
+  """
+  Connection state: expecting _state_expect bytes of raw data.
+  """
+
 primitive _ReadChunked
+  """
+  Connection state: expecting a chunk of chunked data.
+  """
 
-class _ReadData
-  var size: USize
-  new create(size': USize) => size = size'
+primitive _ReadChunk
+  """
+  Connection state: expecting a _state_expect byte chunk of data.
+  """
 
-type _ConnectionMode is (_ReadHeader | _ReadData | _ReadChunked)
+type _ConnectionState is
+    (_ReadHeader | _ReadData | _ReadChunked | _ReadChunk)
 
 // ====================================
 
@@ -48,7 +62,8 @@ class _HttpSvrConnection is TCPConnectionNotify
   let _read_yield_count: USize
   let _timeout:          U64
   let _buffer:           Reader            = Reader
-  var _state:            _ConnectionMode   = _ReadHeader
+  var _state:            _ConnectionState  = _ReadHeader
+  var _state_expect:     USize             = 0
   var _persistent:       Bool              = true
   var _timer:           (Timer tag | None) = None
 
@@ -81,9 +96,10 @@ class _HttpSvrConnection is TCPConnectionNotify
     _clear_timer()
     _buffer.append(consume data)
     match _state
-    | _ReadHeader           => _read_headers(conn)
-    | let rd: _ReadData ref => _read_data(conn, rd)
-    | _ReadChunked          => _read_chunked(conn)
+    | _ReadHeader       => _read_request(conn)
+    | _ReadData         => _read_data(conn)
+    | _ReadChunked      => _read_chunked(conn)
+    | _ReadChunk        => None
     end
     if _persistent then _set_timer(conn) end
     times < _read_yield_count
@@ -120,21 +136,23 @@ class _HttpSvrConnection is TCPConnectionNotify
   // line and headers, reading and forwarding raw data, or reading and
   // forwarding chunked data.
 
-  fun ref _read_headers(conn: TCPConnection ref) =>
+  fun ref _read_request(conn: TCPConnection ref) =>
     let eoh = HttpParser.end_of_headers(_buffer)
     if eoh <= _buffer.size() then
       match HttpParser.parse_request(_get_block(eoh))
       | let r: RawHttpRequest =>
         _persistent = r.persistent()
-        /* forward request and current data */
+        // forward request, current data, and change state
         match r.transferEncoding()
         | TENone =>
-          let rd = _ReadData(r.contentLength())
-          _state = rd
           _notifier.request(conn, r.clone())
-          _read_data(conn, rd)
+          _state        = _ReadData
+          _state_expect = r.contentLength()
+          _read_data(conn)
         | TEChunked =>
           _notifier.request(conn, r.clone())
+          _state        = _ReadChunked
+          _state_expect = 0
           _read_chunked(conn)
         else
           HttpResponses.bad_request(conn)
@@ -143,16 +161,17 @@ class _HttpSvrConnection is TCPConnectionNotify
       end
     end
 
-  fun ref _read_data(conn: TCPConnection ref, rd: _ReadData ref) =>
-    let size = _buffer.size().min( rd.size )
+  fun ref _read_data(conn: TCPConnection ref) =>
+    let size = _state_expect.min( _buffer.size() )
     if size > 0 then
       /* forward data */
       _notifier.body(conn, _get_block(size))
     end
-    if (rd.size - size) > 0 then
-      rd.size = rd.size - size
+    if (_state_expect - size) > 0 then
+      _state_expect = _state_expect - size
     else
-      _state = _ReadHeader
+      _state        = _ReadHeader
+      _state_expect = 0
       /* forward end-of-data */
       _notifier.end_of_body(conn)
     end
