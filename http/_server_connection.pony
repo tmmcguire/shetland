@@ -107,6 +107,13 @@ class _HttpSvrConnection is TCPConnectionNotify
     end
     _timer = None
 
+  fun ref _get_block(size: USize): Array[U8] iso^ =>
+    try
+      _buffer.block(size)?
+    else
+      recover Array[U8](0) end
+    end
+
   // ----------------------------------
 
   // Three possible states for the connection: expecting the request
@@ -116,8 +123,7 @@ class _HttpSvrConnection is TCPConnectionNotify
   fun ref _read_headers(conn: TCPConnection ref) =>
     let eoh = HttpParser.end_of_headers(_buffer)
     if eoh <= _buffer.size() then
-
-      match try HttpParser.parse_request(_buffer.block(eoh)?) end
+      match HttpParser.parse_request(_get_block(eoh))
       | let r: RawHttpRequest =>
         _persistent = r.persistent()
         /* forward request and current data */
@@ -135,16 +141,13 @@ class _HttpSvrConnection is TCPConnectionNotify
         end
       | None => HttpResponses.bad_request(conn)
       end
-
     end
 
   fun ref _read_data(conn: TCPConnection ref, rd: _ReadData ref) =>
     let size = _buffer.size().min( rd.size )
     if size > 0 then
-      try
-        /* forward data */
-        _notifier.body(conn, _buffer.block(size)?)
-      end
+      /* forward data */
+      _notifier.body(conn, _get_block(size))
     end
     if (rd.size - size) > 0 then
       rd.size = rd.size - size
