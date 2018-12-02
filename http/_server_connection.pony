@@ -67,6 +67,9 @@ class _HttpSvrConnection is TCPConnectionNotify
     _set_timer(conn)
 
   fun ref closed(conn: TCPConnection ref): None val =>
+    if not (_state is _ReadHeader) then
+      _notifier.bad_request(conn)
+    end
     _clear_timer()
 
   fun ref received(
