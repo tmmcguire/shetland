@@ -58,3 +58,7 @@ class iso MyRequestNotify is HttpSvrConnectionNotify
   fun ref end_of_body(connection: TCPConnection tag) =>
     _out.print("MyRequestNotify end of data" + _persistent.string())
     HttpResponses.ok(connection, not _persistent)
+
+  fun ref bad_request(connection: TCPConnection tag) =>
+    _out.print("MyRequestNotify bad request")
+    HttpResponses.bad_request(connection)
