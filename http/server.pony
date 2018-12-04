@@ -34,13 +34,21 @@ class val HttpServer
     notifier: HttpSvrListenerNotify iso,
     host: String = "",
     service: String = "8080",
-    limit: USize = 0,
-    init_size: USize = 64,
-    max_size: USize = 16384)
+    limit: USize = 0                         /* See TCPListener, bytes */,
+    init_size: USize = 64                    /* See TCPListener, bytes */,
+    max_size: USize = 16384                  /* See TCPListener, bytes */,
+    read_yield_count: USize = 10             /* 10 requests / yield */,
+    timeout:          U64   = 10_000_000_000 /* 10 seconds */,
+    maximum_size:     USize = 80 * 1024      /* Max request header, bytes */)
   =>
     _listener = TCPListener(
       auth,
-      _HttpSvrConnectionHandler(consume notifier),
+      _HttpSvrConnectionHandler(
+        consume notifier,
+        read_yield_count,
+        timeout,
+        maximum_size
+      ),
       host,
       service,
       limit,
@@ -53,11 +61,22 @@ class val HttpServer
 // ====================================
 
 class _HttpSvrConnectionHandler is TCPListenNotify
-  let _notifier: HttpSvrListenerNotify iso
-  let _timers: Timers = Timers()
+  let _notifier:             HttpSvrListenerNotify iso
+  let _read_yield_count:     USize
+  let _timeout:              U64
+  let _maximum_request_size: USize
+  let _timers:               Timers = Timers()
 
-  new iso create(notifier: HttpSvrListenerNotify iso) =>
-    _notifier = consume notifier
+  new iso create(
+      notifier: HttpSvrListenerNotify iso,
+      read_yield_count: USize = 10             /* 10 requests / yield */,
+      timeout:          U64   = 10_000_000_000 /* 10 seconds */,
+      maximum_size:     USize = 80 * 1024      /* bytes */)
+  =>
+    _notifier             = consume notifier
+    _read_yield_count     = read_yield_count
+    _timeout              = timeout
+    _maximum_request_size = maximum_size
 
   // Process has bound to a port
   fun ref listening(listen: TCPListener ref): None =>
@@ -73,5 +92,11 @@ class _HttpSvrConnectionHandler is TCPListenNotify
 
   // Client connected
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    _HttpSvrConnection(_timers, _notifier.connected())
+    _HttpSvrConnection(
+      _timers,
+      _notifier.connected(),
+      _read_yield_count,
+      _timeout,
+      _maximum_request_size
+    )
 

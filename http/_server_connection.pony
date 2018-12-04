@@ -57,26 +57,29 @@ class _HttpSvrConnection is TCPConnectionNotify
     "Chunked". Otherwise, the end of the request is marked by the close of
     the connection.
   """
-  let _timers:           Timers
-  let _notifier:         HttpSvrConnectionNotify ref
-  let _read_yield_count: USize
-  let _timeout:          U64
-  let _buffer:           Reader            = Reader
-  var _state:            _ConnectionState  = _ReadHeader
-  var _state_expect:     USize             = 0
-  var _persistent:       Bool              = true
-  var _timer:           (Timer tag | None) = None
+  let _timers:               Timers
+  let _notifier:             HttpSvrConnectionNotify ref
+  let _read_yield_count:     USize
+  let _timeout:              U64
+  let _maximum_request_size: USize
+  let _buffer:               Reader            = Reader
+  var _state:                _ConnectionState  = _ReadHeader
+  var _state_expect:         USize             = 0
+  var _persistent:           Bool              = true
+  var _timer:               (Timer tag | None) = None
 
   new iso create(
       timers:           Timers,
       notifier:         HttpSvrConnectionNotify iso,
       read_yield_count: USize = 10             /* 10 requests / yield */,
-      timeout:          U64   = 10_000_000_000 /* 10 seconds */)
+      timeout:          U64   = 10_000_000_000 /* 10 seconds */,
+      maximum_size:     USize = 80 * 1024      /* bytes */)
   =>
-    _timers           = timers
-    _notifier         = consume notifier
-    _read_yield_count = read_yield_count
-    _timeout          = timeout
+    _timers               = timers
+    _notifier             = consume notifier
+    _read_yield_count     = read_yield_count
+    _timeout              = timeout
+    _maximum_request_size = maximum_size
 
   fun ref accepted(conn: TCPConnection ref): None val =>
     _set_timer(conn)
@@ -159,6 +162,8 @@ class _HttpSvrConnection is TCPConnectionNotify
         end
       | None => HttpResponses.bad_request(conn)
       end
+    elseif _buffer.size() > _maximum_request_size then
+      HttpResponses.request_too_large(conn)
     end
 
   fun ref _read_data(conn: TCPConnection ref) =>

@@ -16,6 +16,10 @@ primitive HttpResponses
       conn.dispose()
     end
 
+  fun request_too_large(conn: TCPConnection tag) =>
+    conn.write("HTTP/1.1 413 Request too larnge\r\nConnection: close\r\n\r\n")
+    conn.dispose()
+
   fun bad_request(conn: TCPConnection tag) =>
     Debug("400 Bad request")
     conn.write("HTTP/1.1 400 Bad requset\r\nConnection: close\r\n\r\n")
