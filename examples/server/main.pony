@@ -1,12 +1,31 @@
+use "files"
 use "format"
 use "net"
+use "net/ssl"
 use "signals"
 use "../../http"
 
 actor Main
   new create(env: Env) =>
     try
-      let listener = HttpServer(env.root as AmbientAuth, ListenHandler(env.out) where host = "", service = "8080")
+      let auth   = env.root as AmbientAuth
+      let sslCtx = recover
+        SSLContext
+          // .>set_authority(FilePath(auth, "./examples/net/cert.pem")?)?
+          .>set_cert(
+            FilePath(auth, "./examples/server/cert.pem")?,
+            FilePath(auth, "./examples/server/key.pem")?
+          )?
+      end
+      env.out.print("created ssl context")
+      let listener = HttpServer(
+        auth,
+        ListenHandler(env.out)
+        where
+          sslCtx  = consume sslCtx,
+          host    = "",
+          service = "8080"
+      )
       SignalHandler(SigHandler(listener), Sig.hup())
       SignalHandler(SigHandler(listener), Sig.term())
       SignalHandler(SigHandler(listener), Sig.int())

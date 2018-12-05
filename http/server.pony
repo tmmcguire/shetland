@@ -1,6 +1,7 @@
 use "buffered"
 use "format"
 use "net"
+use "net/ssl"
 use "signals"
 use "time"
 
@@ -12,6 +13,7 @@ interface HttpSvrListenerNotify
   fun ref listening(local_address: NetAddress val) => None
   fun ref not_listening() => None
   fun ref closed() => None
+  fun ref ssl_error() => None
   fun ref connected(): HttpSvrConnectionNotify iso^
 
 // ====================================
@@ -32,19 +34,21 @@ class val HttpServer
   new val create(
     auth: HttpServerAuth,
     notifier: HttpSvrListenerNotify iso,
-    host: String = "",
-    service: String = "8080",
-    limit: USize = 0                         /* See TCPListener, bytes */,
-    init_size: USize = 64                    /* See TCPListener, bytes */,
-    max_size: USize = 16384                  /* See TCPListener, bytes */,
-    read_yield_count: USize = 10             /* 10 requests / yield */,
-    timeout:          U64   = 10_000_000_000 /* 10 seconds */,
-    maximum_size:     USize = 80 * 1024      /* Max request header, bytes */)
+    host:             String = ""                /* Listening address */,
+    service:          String = "8080"            /* Listening port */,
+    sslCtx:          (None | SSLContext) = None  /* SSL configuration */,
+    limit:            USize = 0                  /* See TCPListener, bytes */,
+    init_size:        USize = 64                 /* See TCPListener, bytes */,
+    max_size:         USize = 16384              /* See TCPListener, bytes */,
+    read_yield_count: USize = 10                 /* 10 requests / yield */,
+    timeout:          U64   = 10_000_000_000     /* 10 seconds */,
+    maximum_size:     USize = 80 * 1024          /* Max HTTP header, bytes */)
   =>
     _listener = TCPListener(
       auth,
       _HttpSvrConnectionHandler(
         consume notifier,
+        sslCtx,
         read_yield_count,
         timeout,
         maximum_size
@@ -62,6 +66,7 @@ class val HttpServer
 
 class _HttpSvrConnectionHandler is TCPListenNotify
   let _notifier:             HttpSvrListenerNotify iso
+  let _sslCtx:              (None | SSLContext)
   let _read_yield_count:     USize
   let _timeout:              U64
   let _maximum_request_size: USize
@@ -69,11 +74,13 @@ class _HttpSvrConnectionHandler is TCPListenNotify
 
   new iso create(
       notifier: HttpSvrListenerNotify iso,
-      read_yield_count: USize = 10             /* 10 requests / yield */,
-      timeout:          U64   = 10_000_000_000 /* 10 seconds */,
-      maximum_size:     USize = 80 * 1024      /* bytes */)
+      sslCtx:          (None | SSLContext) = None /* SSL configuration */,
+      read_yield_count: USize = 10                /* 10 requests / yield */,
+      timeout:          U64   = 10_000_000_000    /* 10 seconds */,
+      maximum_size:     USize = 80 * 1024         /* bytes */)
   =>
     _notifier             = consume notifier
+    _sslCtx               = sslCtx
     _read_yield_count     = read_yield_count
     _timeout              = timeout
     _maximum_request_size = maximum_size
@@ -92,11 +99,37 @@ class _HttpSvrConnectionHandler is TCPListenNotify
 
   // Client connected
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    _HttpSvrConnection(
-      _timers,
-      _notifier.connected(),
-      _read_yield_count,
-      _timeout,
-      _maximum_request_size
-    )
+    match _sslCtx
+    | let sslCtx: SSLContext =>
+      try
+        SSLConnection(
+          _HttpSvrConnection(
+            _timers,
+            _notifier.connected(),
+            _read_yield_count,
+            _timeout,
+            _maximum_request_size
+          ),
+          sslCtx.server()?
+        )
+      else
+        _notifier.ssl_error()
+        _HttpSvrBadSslConnection
+      end
+    else
+      _HttpSvrConnection(
+        _timers,
+        _notifier.connected(),
+        _read_yield_count,
+        _timeout,
+        _maximum_request_size
+      )
+    end
 
+class _HttpSvrBadSslConnection is TCPConnectionNotify
+  """
+  Connection handler for bad SSL connections: closes the connection as
+  soon as possible.
+  """
+  fun ref accepted(conn: TCPConnection ref) => conn.dispose()
+  fun ref connect_failed(conn: TCPConnection ref): None val => None
