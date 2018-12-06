@@ -5,7 +5,7 @@ primitive HttpResponses
 
   fun ok(conn: TCPConnection tag, close: Bool): None =>
     Debug("200 Ok " + close.string())
-    conn.write("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n")
+    conn.write("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 4\r\n")
     if close then
       conn.write("Connection: close\r\n")
     else

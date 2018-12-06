@@ -1,4 +1,5 @@
 use "buffered"
+use "debug"
 use "format"
 use "net"
 use "net/ssl"
@@ -9,11 +10,19 @@ type HttpServerAuth is (TCPListenerAuth | AmbientAuth | NetAuth | TCPAuth | TCPL
 
 // ====================================
 
+primitive SslAlpnResolverError
+primitive SslServerCreationError
+primitive SslAuthFailed
+
+type HttpSslError is (SslAlpnResolverError | SslServerCreationError | SslAuthFailed)
+
+// ====================================
+
 interface HttpSvrListenerNotify
   fun ref listening(local_address: NetAddress val) => None
-  fun ref not_listening() => None
-  fun ref closed() => None
-  fun ref ssl_error() => None
+  fun ref not_listening()                          => None
+  fun ref closed()                                 => None
+  fun ref ssl_error(err: HttpSslError)             => None
   fun ref connected(): HttpSvrConnectionNotify iso^
 
 // ====================================
@@ -23,8 +32,9 @@ interface HttpSvrConnectionNotify
   fun ref body(connection: TCPConnection box, data: Array[U8 val] iso)
   fun ref end_of_body(connection: TCPConnection box)
   fun ref bad_request(connection: TCPConnection box)
-  fun ref throttled(connection: TCPConnection box) => None
+  fun ref throttled(connection: TCPConnection box)   => None
   fun ref unthrottled(connection: TCPConnection box) => None
+  fun ref ssl_error(err: HttpSslError)               => None
 
 // ====================================
 
@@ -32,23 +42,26 @@ class val HttpServer
   let _listener: TCPListener tag
 
   new val create(
-    auth: HttpServerAuth,
-    notifier: HttpSvrListenerNotify iso,
-    host:             String = ""                /* Listening address */,
-    service:          String = "8080"            /* Listening port */,
-    sslCtx:          (None | SSLContext) = None  /* SSL configuration */,
-    limit:            USize = 0                  /* See TCPListener, bytes */,
-    init_size:        USize = 64                 /* See TCPListener, bytes */,
-    max_size:         USize = 16384              /* See TCPListener, bytes */,
-    read_yield_count: USize = 10                 /* 10 requests / yield */,
-    timeout:          U64   = 10_000_000_000     /* 10 seconds */,
-    maximum_size:     USize = 80 * 1024          /* Max HTTP header, bytes */)
+    auth:             HttpServerAuth,
+    notifier:         HttpSvrListenerNotify iso,
+    /* Listening address */
+    host:             String = "",
+    /* Listening port */
+    service:          String = "8080",
+    /* SSL configuration */
+    sslCtx:          (None | SSLContext iso) = None,
+    limit:            USize = 0              /* See TCPListener, bytes */,
+    init_size:        USize = 64             /* See TCPListener, bytes */,
+    max_size:         USize = 16384          /* See TCPListener, bytes */,
+    read_yield_count: USize = 10             /* 10 requests / yield */,
+    timeout:          U64   = 10_000_000_000 /* 10 seconds */,
+    maximum_size:     USize = 80 * 1024      /* Max HTTP header, bytes */)
   =>
     _listener = TCPListener(
       auth,
       _HttpSvrConnectionHandler(
         consume notifier,
-        sslCtx,
+        consume sslCtx,
         read_yield_count,
         timeout,
         maximum_size
@@ -66,21 +79,31 @@ class val HttpServer
 
 class _HttpSvrConnectionHandler is TCPListenNotify
   let _notifier:             HttpSvrListenerNotify iso
-  let _sslCtx:              (None | SSLContext)
+  let _sslCtx:              (None | SSLContext val)
   let _read_yield_count:     USize
   let _timeout:              U64
   let _maximum_request_size: USize
   let _timers:               Timers = Timers()
 
   new iso create(
-      notifier: HttpSvrListenerNotify iso,
-      sslCtx:          (None | SSLContext) = None /* SSL configuration */,
-      read_yield_count: USize = 10                /* 10 requests / yield */,
-      timeout:          U64   = 10_000_000_000    /* 10 seconds */,
-      maximum_size:     USize = 80 * 1024         /* bytes */)
+      notifier:         HttpSvrListenerNotify iso,
+      sslCtx:          (None | SSLContext iso) = None /* SSL configuration */,
+      read_yield_count: USize = 10                    /* 10 requests / yield */,
+      timeout:          U64   = 10_000_000_000        /* 10 seconds */,
+      maximum_size:     USize = 80 * 1024             /* bytes */)
   =>
+    // ALPN
+    let ctx = match consume sslCtx
+    | let ctx: SSLContext iso =>
+      let resolver = ALPNStandardProtocolResolver(["http/1.1"], false)
+      if not ctx.alpn_set_resolver(resolver) then
+        notifier.ssl_error(SslAlpnResolverError)
+      end
+      consume ctx
+    else None
+    end
     _notifier             = consume notifier
-    _sslCtx               = sslCtx
+    _sslCtx               = consume ctx
     _read_yield_count     = read_yield_count
     _timeout              = timeout
     _maximum_request_size = maximum_size
@@ -102,29 +125,23 @@ class _HttpSvrConnectionHandler is TCPListenNotify
     match _sslCtx
     | let sslCtx: SSLContext =>
       try
-        SSLConnection(
-          _HttpSvrConnection(
-            _timers,
-            _notifier.connected(),
-            _read_yield_count,
-            _timeout,
-            _maximum_request_size
-          ),
-          sslCtx.server()?
-        )
+        SSLConnection(_httpConnection(), sslCtx.server()?)
       else
-        _notifier.ssl_error()
+        _notifier.ssl_error(SslServerCreationError)
         _HttpSvrBadSslConnection
       end
     else
-      _HttpSvrConnection(
-        _timers,
-        _notifier.connected(),
-        _read_yield_count,
-        _timeout,
-        _maximum_request_size
-      )
+      _httpConnection()
     end
+
+  fun ref _httpConnection(): TCPConnectionNotify iso^ =>
+    _HttpSvrConnection(
+      _timers,
+      _notifier.connected(),
+      _read_yield_count,
+      _timeout,
+      _maximum_request_size
+    )
 
 class _HttpSvrBadSslConnection is TCPConnectionNotify
   """

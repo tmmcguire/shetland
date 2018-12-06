@@ -7,24 +7,32 @@ use "../../http"
 
 actor Main
   new create(env: Env) =>
+    var ssl: Bool = false
     try
       let auth   = env.root as AmbientAuth
-      let sslCtx = recover
-        SSLContext
-          // .>set_authority(FilePath(auth, "./examples/net/cert.pem")?)?
-          .>set_cert(
-            FilePath(auth, "./examples/server/cert.pem")?,
-            FilePath(auth, "./examples/server/key.pem")?
-          )?
+      let sslCtx = if
+        try (env.args.size() > 1) and (env.args(1)? == "-ssl") else false end
+      then
+        ssl = true
+        recover
+          SSLContext
+            // .>set_authority(FilePath(auth, "./examples/net/cert.pem")?)?
+            .>set_cert(
+              FilePath(auth, "./examples/server/cert.pem")?,
+              FilePath(auth, "./examples/server/key.pem")?
+            )?
+        end
+      else
+        ssl = false
+        None
       end
-      env.out.print("created ssl context")
       let listener = HttpServer(
         auth,
         ListenHandler(env.out)
         where
           sslCtx  = consume sslCtx,
           host    = "",
-          service = "8080"
+          service = if ssl then "8443" else "8080" end
       )
       SignalHandler(SigHandler(listener), Sig.hup())
       SignalHandler(SigHandler(listener), Sig.term())
