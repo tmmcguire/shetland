@@ -111,9 +111,9 @@ class _HttpSvrConnection is (TCPConnectionNotify & ALPNProtocolNotify)
     // If the protocol is not idle (i.e. in the process of reading a
     // request), a bad request response is sent.
     Debug("closed")
-    if not (_protocol.idle()) then
-      _notifier.bad_request(conn)
-    end
+    // if not (_protocol.idle()) then
+      // _notifier.bad_request(conn)
+    // end
     _clear_timer()
 
   // ----------------------------------
